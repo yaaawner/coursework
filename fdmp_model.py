@@ -1,5 +1,3 @@
-from forecast import drift_moving_average
-from forecast import learning
 import math
 
 ALPHA = 100
@@ -38,7 +36,7 @@ for rate in buf_rate:
         index_inc_rate += 1
 
     elif rate + ALPHA < requirement:
-        difrate = (rate - requirement)
+        difrate = (requirement - rate)
         difstep = difrate // pred
         open_subflow_flag = True
         index_inc_rate = 1

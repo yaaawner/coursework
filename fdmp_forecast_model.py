@@ -3,44 +3,63 @@ from forecast import learning
 import math
 
 ALPHA = 100
-#TODO: io with files, open subflow, close subflow, change rate
+#TODO: io with files
 
-buf_rate = []
-rtt = 0
-cwnd = 0
-step = 0
-requirement = 0
-FT = []
-TT = []
+buf_rate = [55000, 50000, 49000, 46789, 26789, 10920, 20000, 30000, 20000, 40000] #input from file
+rtt = 100
+cwnd = 4000
+step = 100
+requirement = 45000
+buffer = []
+
 time = 0
-forecast_list = [requirement+100 for j in range(100)]
-k = 3
-
 open_subflow_flag = False
-#TODO: 1,5 RTT, slowstart (linear for simple, but need to calculate time)
+
+difrate = 0
+difstep = 0
+index_inc_rate = 0
+k = 1
 
 i = 0
 for rate in buf_rate:
+    buffer.append(rate)
     if i < 100:
         i += 1
     else:
         i = 0
-
     time += step
-    h = (2 + math.log(cwnd, 2)) * rtt
-    if h < step:
+    time_to_open_subflow = (2 + math.log(cwnd, 2)) * rtt
+    #print(time_to_open_subflow)
+    prediction = drift_moving_average(buffer, step, k, rtt, cwnd)
+
+    if time_to_open_subflow < step:
         pred = 1
     else:
-        pred = h // step
+        pred = time_to_open_subflow // step
 
     index = (i + pred) % 100
-    forecast_list[i + pred]=drift_moving_average(buf_rate, step, k, rtt, cwnd)
+    #forecast_list[i + pred] = drift_moving_average(buf_rate, step, k, rtt, cwnd)
 
-    if rate < requirement - ALPHA and requirement - ALPHA < forecast_list[i]:
-        k = learning(buf_rate, step, k, rtt, cwnd, rate)
-        FT.append(time)
-    elif rate < requirement - ALPHA and forecast_list[i] < requirement - ALPHA:
-        TT.append(time)
+    if open_subflow_flag:
+        rate += difstep * index_inc_rate
+        index_inc_rate += 1
+        #print(rate)
 
-    print(time, rate, forecast_list[i])
+    elif prediction + ALPHA < requirement:
+        #print("drift", drift_moving_average(buf_rate, step, k, rtt, cwnd))
+        difrate = (requirement - prediction)
+        difstep = difrate // pred
+        open_subflow_flag = True
+        index_inc_rate = 1
 
+    elif rate + ALPHA < requirement:
+        difrate = requirement - rate
+        difstep = difrate // pred
+        open_subflow_flag = True
+        index_inc_rate = 1
+        k = learning(buffer, step, k, rtt, cwnd, rate)
+
+    if rate > requirement:          #!!!
+        open_subflow_flag = False
+
+    print(time, rate)
