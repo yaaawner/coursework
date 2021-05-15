@@ -1,15 +1,16 @@
 from forecast import drift_moving_average
 from forecast import learning
 import math
+import csv
 
 ALPHA = 100
 #TODO: io with files
 
-buf_rate = [55000, 50000, 49000, 46789, 26789, 10920, 20000, 30000, 20000, 40000] #input from file
+#buf_rate = [55000, 50000, 49000, 46789, 26789, 10920, 20000, 30000, 20000, 40000] #input from file
 rtt = 100
-cwnd = 4000
+cwnd = 100
 step = 100
-requirement = 45000
+requirement = 10000
 buffer = []
 
 time = 0
@@ -19,47 +20,61 @@ difrate = 0
 difstep = 0
 index_inc_rate = 0
 k = 1
-
+number_flow = 1
+subflows = [0]
 i = 0
-for rate in buf_rate:
-    buffer.append(rate)
-    if i < 100:
-        i += 1
-    else:
-        i = 0
+input_file = open('datasets/LTE_Dataset/Dataset/static/A_2017.11.22_10.06.58.csv', 'r')
+output_file = open('results/cwnd_pred.csv', 'w', newline='')
+reader = csv.DictReader(input_file)
+writer = csv.writer(output_file)
+#writer.writerow(['Time', 'Rate'])
+
+for row in reader:
+    rate = int(row['DL_bitrate'])
+
+    cwnd = rate // rtt + 1
     time += step
     time_to_open_subflow = (2 + math.log(cwnd, 2)) * rtt
-    #print(time_to_open_subflow)
-    prediction = drift_moving_average(buffer, step, k, rtt, cwnd)
 
     if time_to_open_subflow < step:
         pred = 1
     else:
         pred = time_to_open_subflow // step
-
-    index = (i + pred) % 100
     #forecast_list[i + pred] = drift_moving_average(buf_rate, step, k, rtt, cwnd)
 
+    for i in range(len(subflows)):
+        subflows[i] = rate
+
     if open_subflow_flag:
-        rate += difstep * index_inc_rate
+        subflows[-1] = difstep * index_inc_rate
         index_inc_rate += 1
-        #print(rate)
 
-    elif prediction + ALPHA < requirement:
-        #print("drift", drift_moving_average(buf_rate, step, k, rtt, cwnd))
-        difrate = (requirement - prediction)
+    sumrate = sum(subflows)
+
+    buffer.append(sumrate)
+    prediction = drift_moving_average(buffer, step, k, rtt, cwnd)
+
+    if prediction + ALPHA < requirement:
+        difrate = rate
         difstep = difrate // pred
         open_subflow_flag = True
         index_inc_rate = 1
+        number_flow += 1
+        subflows.append(0)
 
-    elif rate + ALPHA < requirement:
-        difrate = requirement - rate
+    elif sumrate + ALPHA < requirement:
+        k = learning(buffer, step, k, rtt, cwnd, sumrate)
+        difrate = rate
         difstep = difrate // pred
         open_subflow_flag = True
         index_inc_rate = 1
-        k = learning(buffer, step, k, rtt, cwnd, rate)
+        number_flow += 1
+        subflows.append(0)
 
-    if rate > requirement:          #!!!
+    if sumrate > requirement:
         open_subflow_flag = False
+        if number_flow > 1:
+            number_flow -= 1
+            subflows.pop()
 
-    print(time, rate)
+    writer.writerow([str(int(sumrate))])

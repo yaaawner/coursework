@@ -24,19 +24,22 @@ def learning(rate_list, step, k, rtt, cwnd, nowrate):
     else:
         t = int(h // step)
 
+    #if t > len(rate_list):
+        #t = len(rate)
+
     if MAXK > len(rate_list):
         maxk = len(rate_list) -1
     else:
         maxk = MAXK
 
-    for i in range (1, MAXK + 1):
+    if len(rate_list) < t + maxk:
+        maxk = len(rate_list) - t - 1
+
+    for i in range (1, maxk):
         average += h * (rate_list[-1 - t] - rate_list[-1 -t - i]) / (step * i)
         res = rate_list[-1 - t] + average / i
 
-        if nowrate > res:
-            mae = nowrate - res
-        else:
-            mae = res - nowrate
+        mae = nowrate - res
 
         if i == 1:
             min = mae
