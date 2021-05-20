@@ -2,7 +2,7 @@ import math
 
 MAXK = 10
 
-#TODO: array mae
+MAE_list = [0 for i in range(10)]
 
 def drift_moving_average(rate_list, step, k, rtt, cwnd):
     if len(rate_list) < k+1:
@@ -35,16 +35,20 @@ def learning(rate_list, step, k, rtt, cwnd, nowrate):
     if len(rate_list) < t + maxk:
         maxk = len(rate_list) - t - 1
 
-    for i in range (1, maxk):
+    for i in range (1, maxk+1):
         average += h * (rate_list[-1 - t] - rate_list[-1 -t - i]) / (step * i)
         res = rate_list[-1 - t] + average / i
 
-        mae = nowrate - res
+        mae = int(math.fabs(nowrate - res))
+        if MAE_list[i - 1] == 0:
+            MAE_list[i - 1] = mae
+        else:
+            MAE_list[i - 1] = (MAE_list[i - 1] + mae) //2
 
         if i == 1:
-            min = mae
-        elif mae < min:
-            min = mae
+            min = MAE_list[i - 1]
+        elif MAE_list[i - 1] < min:
+            min = MAE_list[i - 1]
             kmin = i
 
     return kmin
